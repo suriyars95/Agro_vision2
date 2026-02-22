@@ -1,15 +1,12 @@
-Flask
-Gunicorn
-keras
-tensorflow
-numpy
-Werkzeug
-matplotlib
-scikit-learn
-flask-cors
-waitress
-ultralytics
-# Note: install PyTorch separately following official instructions at https://pytorch.org/
-# Example (Windows CPU-only):
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-# For GPU install follow the selector on the PyTorch site for your CUDA version.
+Flask==2.3.0
+Gunicorn==21.2.0
+flask-cors==4.0.0
+numpy<2.0
+opencv-python-headless==4.8.0.76
+ultralytics>=8.3.0
+torch>=2.0.0
+torchvision>=0.15.0
+Werkzeug==2.3.0
+Pillow>=10.0.0
+python-dotenv==1.0.0
+requests>=2.31.0

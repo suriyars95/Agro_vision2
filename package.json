@@ -1,0 +1,16 @@
+{
+  "name": "agrofrontback",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev:frontend",
+    "dev:frontend": "cd Frontend && npm run dev",
+    "dev:backend": "cd backend && python app.py",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd Frontend && npm run build",
+    "preview": "cd Frontend && npm run preview"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  }
+}

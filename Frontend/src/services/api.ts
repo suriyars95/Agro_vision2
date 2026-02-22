@@ -11,6 +11,7 @@ export interface PredictionResult {
   medicines?: string[];
   error?: string;
   details?: string;
+  boxes?: any[];
 }
 
 /**

@@ -31,11 +31,15 @@ class YOLODetector:
         self.device = device or ('0' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.model_path = None
-        
-        # Find and load model
-        self.model_path = self._find_model(model_path)
+        # Always use best_wheat_yolo.pt in backend/model if available
+        forced_model_path = os.path.join('backend', 'model', 'best_wheat_yolo.pt')
+        if os.path.exists(forced_model_path):
+            self.model_path = forced_model_path
+            logger.info(f"🔗 Forced model path: {self.model_path}")
+        else:
+            self.model_path = self._find_model(model_path)
+            logger.warning(f"⚠️ best_wheat_yolo.pt not found, using fallback: {self.model_path}")
         logger.info(f"🎯 Model path identified: {self.model_path}")
-        
         self._load_model()
     
     def _find_model(self, model_path: Optional[str]) -> str:
@@ -73,10 +77,22 @@ class YOLODetector:
             if os.path.isdir(dir_path):
                 logger.info(f"🔍 Searching: {dir_path}")
                 
-                # First, check for yolo11n.pt (preferred)
+                # First, check for best_wheat_yolo.pt (preferred custom model)
+                wheat_model_path = os.path.join(dir_path, 'best_wheat_yolo.pt')
+                if os.path.exists(wheat_model_path):
+                    logger.info(f"✓ Found wheat model: {wheat_model_path}")
+                    return wheat_model_path
+
+                # Second, check for trained_100_yolov12.pt (previous custom model)
+                custom_model_path = os.path.join(dir_path, 'trained_100_yolov12.pt')
+                if os.path.exists(custom_model_path):
+                    logger.info(f"✓ Found custom model: {custom_model_path}")
+                    return custom_model_path
+
+                # Second, check for yolo11n.pt (fallback base model)
                 yolo11n_path = os.path.join(dir_path, 'yolo11n.pt')
                 if os.path.exists(yolo11n_path):
-                    logger.info(f"✓ Found preferred model: {yolo11n_path}")
+                    logger.info(f"✓ Found base model: {yolo11n_path}")
                     return yolo11n_path
                 
                 try:
@@ -210,6 +226,10 @@ class YOLODetector:
                         # Get class name
                         class_name = result.names.get(cls_id, f"Class_{cls_id}")
                         
+                        # Apply Custom Rule: Rename "Mite" -> "Human Interference"
+                        if str(class_name).lower() == 'mite':
+                            class_name = "Human Interference"
+                        
                         detections.append({
                             'class_name': str(class_name),
                             'confidence': round(float(conf), 3),
@@ -265,6 +285,10 @@ class YOLODetector:
                 
                 # Get class name
                 class_name = result.names.get(cls_id, f"Class_{cls_id}")
+
+                # Apply Custom Rule: Rename "Mite" -> "Human Interference"
+                if str(class_name).lower() == 'mite':
+                    class_name = "Human Interference"
                 
                 detections.append({
                     'class_id': int(cls_id),

@@ -1,4 +1,29 @@
 {
-    "builds": [{"src": "app.py","use": "@vercel/python"}],
-    "routes": [{"src": "/(.*)","dest": "app.py"}]
+  "version": 2,
+  "builds": [
+    {
+      "src": "app.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb",
+        "runtime": "python3.11"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
+  ],
+  "env": {
+    "PYTHONUNBUFFERED": "1",
+    "USE_YOLO": "1"
+  },
+  "functions": {
+    "app.py": {
+      "maxDuration": 60,
+      "memory": 3008
+    }
+  }
 }

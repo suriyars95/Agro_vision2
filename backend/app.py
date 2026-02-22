@@ -26,6 +26,9 @@ from datetime import datetime
 # IMPORTS & INITIALIZATION
 # ============================================================================
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, request, jsonify, Response
 from werkzeug.utils import secure_filename
 
@@ -53,34 +56,90 @@ if not os.path.exists(UPLOAD_FOLDER):
 yolo_detector = None
 fallback_detector = None
 
-def _init_yolo():
-    """Initialize YOLO detector with fallback chain"""
-    global yolo_detector
+# Optimized Async Model Loading with Model Registry
+import threading
+import time
+from model_registry import ModelRegistry
+
+# Initialize Registry
+from model_registry import ModelRegistry
+from llm_registry import LLMRegistry
+
+model_registry = ModelRegistry()
+llm_registry = LLMRegistry()
+
+# Global status tracking
+model_status = {
+    "active_model_id": model_registry.active_model_id,
+    "status": "initializing",
+    "details": "Starting model loader...",
+    "start_time": time.time()
+}
+
+def load_active_model_async():
+    """Load the currently active model from registry"""
+    global yolo_detector, fallback_detector
+    
+    active_model = model_registry.get_active_model()
+    if not active_model:
+        logger.error("❌ No active model found in registry!")
+        model_status["status"] = "error"
+        model_status["details"] = "No active model configuration"
+        return
+
+    logger.info(f"🧵 [Background] Loading active model: {active_model.name} ({active_model.id})")
+    model_status["status"] = "loading"
+    model_status["active_model_id"] = active_model.id
     
     try:
-        if USE_YOLO:
-            logger.info("🎯 Initializing YOLO detector...")
+        # Clear existing models to free memory
+        yolo_detector = None
+        fallback_detector = None
+        
+        # Simulate small delay for server responsiveness
+        time.sleep(1)
+
+        if active_model.type == 'yolo':
+            logger.info(f"   Type: YOLO | Path: {active_model.path}")
             from yolo_detector import YOLODetector
+            
             yolo_detector = YOLODetector(
+                model_path=active_model.path,
                 conf_threshold=float(os.environ.get('YOLO_CONF_THRESH', '0.25')),
                 device=os.environ.get('YOLO_DEVICE', None)
             )
-            logger.info("✅ YOLO detector ready")
-            return True
+            model_status["status"] = "ready"
+            model_status["details"] = f"Loaded {active_model.name}"
+            logger.info(f"✅ [Background] Model ready: {active_model.name}")
+            
+        elif active_model.type == 'fallback':
+            logger.info(f"   Type: Fallback/Keras | Path: {active_model.path}")
+            # Note: The fallback implementation in predict.py might need path adjustment
+            # For now, we reuse the existing _init_fallback logic but mapped to this model
+            if _init_fallback():
+                model_status["status"] = "ready"
+                model_status["details"] = f"Loaded {active_model.name}"
+                logger.info(f"✅ [Background] Model ready: {active_model.name}")
+            else:
+                raise RuntimeError("Fallback initialization failed")
+                
     except Exception as e:
-        logger.warning(f"⚠️  YOLO initialization failed: {e}")
-    
-    return False
+        logger.error(f"❌ [Background] Model load failed: {e}")
+        model_status["status"] = "error"
+        model_status["details"] = str(e)
 
 def _init_fallback():
     """Initialize fallback detector (TensorFlow/Keras or mock)"""
     global fallback_detector
     
     try:
-        logger.info("📦 Loading fallback predictor (TensorFlow/Keras)...")
+        # Check if we should use mock directly (faster dev)
+        if os.environ.get('USE_MOCK_FALLBACK', '0') == '1':
+             raise ImportError("Forced mock fallback")
+
+        logger.info("📦 Loading Keras/TensorFlow fallback...")
         from predict import classify_image
         fallback_detector = classify_image
-        logger.info("✅ Fallback predictor loaded")
         return True
     except Exception as e:
         logger.warning(f"⚠️  Fallback predictor load failed: {e}")
@@ -88,18 +147,20 @@ def _init_fallback():
             logger.info("📦 Loading mock fallback...")
             from predict_fallback import classify_image
             fallback_detector = classify_image
-            logger.info("✅ Mock fallback loaded")
             return True
         except Exception as e2:
             logger.error(f"❌ All fallback options failed: {e2}")
             return False
 
-# Initialize detectors at startup
+# Initialize detectors in background
 logger.info("="*60)
-logger.info("🚀 DISEASE DETECTION API - STARTUP")
+logger.info("🚀 DISEASE DETECTION API - MANAGED MODEL SYSTEM")
+logger.info(f"👉 Active Model: {model_registry.active_model_id}")
 logger.info("="*60)
-_init_yolo()
-_init_fallback()
+
+# Start background thread
+loading_thread = threading.Thread(target=load_active_model_async, daemon=True)
+loading_thread.start()
 
 # CORS support
 @app.after_request
@@ -111,6 +172,109 @@ def after_request(response):
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+# ============================================================================
+# MODEL MANAGEMENT ROUTES
+# ============================================================================
+
+@app.route('/models', methods=['GET'])
+def list_models():
+    """List all available models"""
+    return jsonify({
+        'success': True,
+        'models': model_registry.list_models()
+    }), 200
+
+@app.route('/models/active', methods=['GET'])
+def get_active_model_info():
+    """Get active model details"""
+    return jsonify({
+        'success': True,
+        'active_model': model_registry.get_active_model()
+    }), 200
+
+@app.route('/models/switch', methods=['POST'])
+def switch_model():
+    """Switch active model at runtime"""
+    data = request.get_json() or {}
+    model_id = data.get('model_id')
+    
+    if not model_id:
+        return jsonify({'success': False, 'error': 'Current model_id is required'}), 400
+    
+    if model_registry.set_active_model(model_id):
+        # Trigger reload in background
+        threading.Thread(target=load_active_model_async, daemon=True).start()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Switched to model: {model_id}',
+            'active_model': model_id
+        }), 200
+    else:
+        return jsonify({'success': False, 'error': 'Invalid model_id'}), 400
+
+# ============================================================================
+# LLM MANAGEMENT ROUTES
+# ============================================================================
+
+@app.route('/llm/models', methods=['GET'])
+def list_llm_models():
+    """List all available LLM models"""
+    return jsonify({
+        'success': True,
+        'models': llm_registry.list_models()
+    }), 200
+
+@app.route('/llm/active', methods=['GET'])
+def get_active_llm():
+    """Get active LLM details"""
+    return jsonify({
+        'success': True,
+        'active_model': llm_registry.get_active_model()
+    }), 200
+
+@app.route('/llm/switch', methods=['POST'])
+def switch_llm():
+    """Switch active LLM at runtime"""
+    data = request.get_json() or {}
+    model_id = data.get('model_id')
+    
+    if not model_id:
+        return jsonify({'success': False, 'error': 'Current model_id is required'}), 400
+    
+    if llm_registry.set_active_model(model_id):
+        return jsonify({
+            'success': True,
+            'message': f'Switched to LLM: {model_id}',
+            'active_model': model_id
+        }), 200
+    else:
+        return jsonify({'success': False, 'error': 'Invalid model_id'}), 400
+
+@app.route('/llm/generate_report', methods=['POST', 'OPTIONS'])
+def generate_llm_report():
+    """Generate LLM report from analysis data"""
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    data = request.get_json() or {}
+    analysis_data = data.get('analysis_data')
+    if not analysis_data:
+        return jsonify({'success': False, 'error': 'No analysis data provided'}), 400
+        
+    try:
+        report = llm_registry.generate_report(analysis_data)
+        return jsonify({
+            'success': True,
+            'report': report
+        }), 200
+    except Exception as e:
+        logger.error(f"Failed to generate LLM report: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 # ============================================================================
 # UTILITY FUNCTIONS
@@ -175,15 +339,17 @@ def health():
 @app.route('/health', methods=['GET'])
 def status():
     """System status and configuration"""
+    active_model = model_registry.get_active_model()
     return jsonify({
         'status': 'ok',
-        'yolo_ready': yolo_detector is not None,
-        'fallback_ready': fallback_detector is not None,
-        'use_yolo': USE_YOLO,
-        'models': {
-            'primary': 'YOLOv8/v11' if yolo_detector else 'Fallback',
-            'primary_ready': True if yolo_detector else False
-        }
+        'model_status': model_status.get("status"),
+        'active_model': {
+            'id': active_model.id if active_model else 'unknown',
+            'name': active_model.name if active_model else 'unknown',
+            'type': active_model.type if active_model else 'unknown'
+        },
+        'loading_details': model_status.get("details"),
+        'uptime_seconds': round(time.time() - model_status["start_time"]),
     }), 200
 
 @app.route('/predict', methods=['POST', 'OPTIONS'])
@@ -202,6 +368,14 @@ def predict():
             'error': 'No file provided',
             'required': 'file'
         }), 400
+        
+    # Check if models are still loading
+    if model_status.get("status") != "ready":
+        return jsonify({
+            'success': False,
+            'error': f'AI Model is initializing: {model_status.get("details")}',
+            'loading_status': model_status
+        }), 503
     
     file = request.files['file']
     if not file or file.filename == '':
@@ -311,6 +485,39 @@ def predict():
                 os.remove(saved_path)
             except:
                 pass
+@app.route('/upload', methods=['POST', 'OPTIONS'])
+def upload_file():
+    """
+    Upload a file for processing
+    Returns: file_path (server-side path)
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        # Create unique filename to avoid collisions
+        unique_filename = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}"
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        file.save(save_path)
+        
+        logger.info(f"💾 File uploaded: {save_path}")
+        return jsonify({
+            'success': True,
+            'message': 'File uploaded successfully',
+            'file_path': os.path.abspath(save_path),
+            'filename': unique_filename
+        }), 200
+    
+    return jsonify({'error': 'File type not allowed'}), 400
+
 
 @app.route('/api/rtsp-proxy', methods=['GET', 'OPTIONS'])
 def rtsp_proxy():
@@ -371,18 +578,35 @@ def stream_detect():
             # Single frame detection
             import base64
             frame_data = base64.b64decode(data['frame'])
-            nparr = np.frombuffer(frame_data, np.uint8)
-            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             
+            if not frame_data:
+                 logger.warning("⚠️  Received empty frame data")
+                 return jsonify({'success': False, 'error': 'Empty frame data'}), 400
+
+            nparr = np.frombuffer(frame_data, np.uint8)
+            
+            if nparr.size == 0:
+                 logger.warning("⚠️  Decoded frame buffer is empty")
+                 return jsonify({'success': False, 'error': 'Empty frame buffer'}), 400
+
+            try:
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            except cv2.error as e:
+                logger.error(f"❌ OpenCV decode error: {e}")
+                return jsonify({'success': False, 'error': 'Frame decode failed'}), 400
+
             if frame is None:
                 return jsonify({
                     'success': False,
                     'detections': [],
-                    'error': 'Invalid frame'
+                    'error': 'Invalid frame image'
                 }), 400
             
             h, w = frame.shape[:2]
             
+            h, w = frame.shape[:2]
+            
+            # Use whichever detector is loaded
             if yolo_detector:
                 result = yolo_detector.predict_frame(frame)
                 detections = result.get('detections', [])
@@ -421,12 +645,21 @@ def stream_detect():
                     'count': len(boxes),
                     'frame_size': [h, w]
                 }), 200
+            elif fallback_detector:
+                 # Fallback detector usually only handles files, not raw frames efficiently
+                 # For now, return empty or implement frame-based fallback if possible
+                 return jsonify({
+                    'success': True,
+                    'detections': [],
+                    'note': 'Fallback model does not support real-time frame detection',
+                    'frame_size': [h, w]
+                }), 200
             else:
                 # No detector available
                 return jsonify({
                     'success': False,
                     'detections': [],
-                    'error': 'YOLO detector not available'
+                    'error': f'Model initializing or unavailable: {model_status.get("details")}'
                 }), 503
         
         elif 'video_path' in data:

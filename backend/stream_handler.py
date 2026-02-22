@@ -17,11 +17,12 @@ class StreamDetector:
         self.yolo_model = None
         if use_yolo:
             try:
-                # Use yolo_detector which handles model loading with proper fallbacks
-                from yolo_detector import _load_model
-                logger.info("Loading YOLO model via yolo_detector...")
-                self.yolo_model = _load_model()  # Loads yolo11n.pt or yolov8n.pt
-                logger.info("✓ YOLO model loaded successfully")
+                # Always use best_wheat_yolo.pt for stream detection
+                from yolo_detector import YOLODetector
+                import os
+                model_path = os.path.join('backend', 'model', 'best_wheat_yolo.pt')
+                self.yolo_model = YOLODetector(model_path=model_path)
+                logger.info(f"✓ YOLO model loaded successfully: {model_path}")
             except Exception as e:
                 logger.error(f"Failed to load YOLO: {e}")
                 self.use_yolo = False

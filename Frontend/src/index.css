@@ -2,118 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 30 10% 15%;
+    --background: 150 30% 98%;
+    /* Soft Mint White */
+    --foreground: 164 45% 15%;
+    /* Dark Emerald Text */
 
     --card: 0 0% 100%;
-    --card-foreground: 30 10% 15%;
+    --card-foreground: 164 45% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 30 10% 15%;
+    --popover-foreground: 164 45% 15%;
 
-    /* Agricultural color scheme */
-    --primary: 44 89% 57%; /* Harvest Yellow */
-    --primary-foreground: 30 10% 15%;
+    /* Modern Green Palette */
+    --primary: 160 84% 39%;
+    /* Vibrant Emerald */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 123 46% 33%; /* Agri Green */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 142 76% 90%;
+    /* Pale Mint */
+    --secondary-foreground: 160 84% 30%;
 
-    --muted: 30 20% 95%;
-    --muted-foreground: 30 10% 40%;
+    --muted: 150 20% 94%;
+    --muted-foreground: 164 20% 50%;
 
-    --accent: 36 100% 50%; /* Warm Amber */
-    --accent-foreground: 30 10% 15%;
+    --accent: 38 92% 50%;
+    /* Golden Amber */
+    --accent-foreground: 164 45% 15%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 20% 88%;
-    --input: 30 20% 88%;
-    --ring: 44 89% 57%;
+    --border: 150 20% 90%;
+    --input: 150 20% 90%;
+    --ring: 160 84% 39%;
 
-    --radius: 0.75rem;
+    --radius: 1rem;
 
     /* Custom agricultural tokens */
-    --earth-brown: 30 35% 45%;
-    --sky-blue: 200 75% 60%;
-    --wheat-gold: 44 95% 65%;
-    --leaf-green: 123 60% 45%;
-
-    /* Gradients */
-    --gradient-sunrise: linear-gradient(135deg, hsl(44 89% 57%) 0%, hsl(123 46% 33%) 100%);
-    --gradient-hero: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.6) 100%);
-    
-    /* Shadows */
-    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --leaf-gradient-start: 160 84% 39%;
+    --leaf-gradient-end: 142 70% 30%;
   }
 
   .dark {
-    --background: 30 15% 8%;
-    --foreground: 30 5% 95%;
+    --background: 164 35% 8%;
+    /* Deep Jungle Night */
+    --foreground: 150 30% 90%;
 
-    --card: 30 15% 10%;
-    --card-foreground: 30 5% 95%;
+    --card: 164 35% 10%;
+    --card-foreground: 150 30% 90%;
 
-    --popover: 30 15% 10%;
-    --popover-foreground: 30 5% 95%;
+    --popover: 164 35% 10%;
+    --popover-foreground: 150 30% 90%;
 
-    --primary: 44 89% 57%;
-    --primary-foreground: 30 10% 15%;
+    --primary: 160 84% 45%;
+    /* Brighter Emerald for Dark Mode */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 123 46% 33%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 160 40% 20%;
+    --secondary-foreground: 150 30% 90%;
 
-    --muted: 30 15% 15%;
-    --muted-foreground: 30 5% 65%;
+    --muted: 164 30% 15%;
+    --muted-foreground: 150 20% 65%;
 
-    --accent: 36 100% 50%;
-    --accent-foreground: 30 5% 95%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 15% 20%;
-    --input: 30 15% 20%;
-    --ring: 44 89% 57%;
-
-    --earth-brown: 30 35% 55%;
-    --sky-blue: 200 75% 70%;
-    --wheat-gold: 44 95% 70%;
-    --leaf-green: 123 60% 55%;
-
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    --border: 164 30% 20%;
+    --input: 164 30% 20%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased selection:bg-primary/20;
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-md border border-border/50 shadow-lg dark:bg-card/40 dark:border-white/5 transition-all duration-300;
+  }
+
+  .glass-panel {
+    @apply bg-white/60 backdrop-blur-xl border border-white/40 dark:bg-black/40 dark:border-white/5 shadow-sm;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-emerald-600 dark:from-emerald-400 dark:to-teal-400;
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }

@@ -1,28 +1,61 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useRef, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Upload, Camera, CheckCircle, AlertCircle, Radio, Wifi, Video } from "lucide-react";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { Upload, Camera, Wifi, Video, Leaf, Settings, LogOut, Sun, Moon, Menu, CheckCircle2, Activity, ScanLine, Download, X, ArrowRight } from "lucide-react";
 import ImageUploadSection from "@/components/ImageUploadSection";
 import LiveCameraPredictor from "@/components/LiveCameraPredictor";
 import StreamDetector from "@/components/StreamDetector";
+import WeatherSoilWidget from "@/components/WeatherSoilWidget";
+import DroneTelemetryWidget from "@/components/DroneTelemetryWidget";
+import SystemLogWidget from "@/components/SystemLogWidget";
+import CropHealthWidget from "@/components/CropHealthWidget";
+import DetailedReportView from "@/components/DetailedReportView";
 import { toast } from "sonner";
 import { predictDisease } from "@/services/api";
+import { cn } from "@/lib/utils";
+import ModelSelector from "@/components/ModelSelector";
+import LLMSelector from "@/components/LLMSelector";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const FarmerPortal = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<any>(null); // For simple image prediction
+  const [activeTab, setActiveTab] = useState<'upload' | 'drone' | 'camera' | 'rtsp'>('upload');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Advanced Reporting State
+  const [detailedReport, setDetailedReport] = useState<any>(null); // For Stream/Drone reports
+
+  // Drone State
   const [droneUrl, setDroneUrl] = useState("");
   const [isDroneConnected, setIsDroneConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [analyzingDrone, setAnalyzingDrone] = useState(false);
-  const [droneReport, setDroneReport] = useState<any>(null);
-  const [showLiveCamera, setShowLiveCamera] = useState(false);
-  const [cameraReport, setCameraReport] = useState<any>(null);
+  const [showDroneOverlay, setShowDroneOverlay] = useState(true);
+  const [showDroneDetails, setShowDroneDetails] = useState(true);
+
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    document.documentElement.classList.toggle('dark');
+  };
+
+  const handleTabChange = (tab: 'upload' | 'drone' | 'camera' | 'rtsp') => {
+    setActiveTab(tab);
+    setResult(null); // Clear simple result on tab switch used to confuse
+    setDetailedReport(null);
+  };
 
   const handleDroneConnect = () => {
     if (!droneUrl.trim()) {
@@ -30,7 +63,6 @@ const FarmerPortal = () => {
       return;
     }
     setIsConnecting(true);
-    // Simulate connection
     setTimeout(() => {
       setIsDroneConnected(true);
       setIsConnecting(false);
@@ -40,563 +72,330 @@ const FarmerPortal = () => {
 
   const handleDroneDisconnect = () => {
     setIsDroneConnected(false);
-    setDroneReport(null);
     toast.info("Drone disconnected");
   };
 
+  // Upgraded Drone Report Handler
   const handleEndLivestreamReport = () => {
     setAnalyzingDrone(true);
-    
-    // Simulate AI analysis of drone feed
     setTimeout(() => {
-      setDroneReport({
+      const mockReport = {
+        id: "DRONE-LOG-" + Math.floor(Math.random() * 1000),
+        source: "Drone Stream",
+        duration: "12m 45s",
         totalDiseases: 3,
+        timelineData: Array.from({ length: 20 }, (_, i) => ({
+          time: `00:${i * 3}`,
+          confidence: 60 + Math.random() * 35,
+        })),
         diseases: [
           {
-            name: "Wheat Leaf Rust (Puccinia triticina)",
+            name: "Wheat Leaf Rust",
             severity: "High",
             affectedArea: "35%",
-            description: "Fungal infection causing orange-brown pustules on leaves, reducing photosynthetic capacity and yield potential.",
-            steps: [
-              "Isolate affected areas immediately",
-              "Remove and destroy heavily infected plants",
-              "Apply recommended fungicide within 24 hours",
-              "Monitor surrounding crops for 2 weeks"
-            ],
-            medicines: ["Propiconazole 25% EC", "Tebuconazole 250 EC", "Mancozeb 75% WP"]
-          },
-          {
-            name: "Powdery Mildew (Blumeria graminis)",
-            severity: "Medium",
-            affectedArea: "20%",
-            description: "White powdery fungal growth on leaf surfaces, stems, and heads affecting plant growth and grain quality.",
-            steps: [
-              "Improve air circulation in the field",
-              "Apply sulfur-based fungicide",
-              "Reduce nitrogen fertilization",
-              "Schedule follow-up spray in 10-14 days"
-            ],
-            medicines: ["Sulfur 80% WDG", "Triadimefon 25% WP", "Carbendazim 50% WP"]
-          },
-          {
-            name: "Septoria Leaf Blotch",
-            severity: "Low",
-            affectedArea: "8%",
-            description: "Brown lesions with dark borders on lower leaves, gradually moving upward during wet conditions.",
-            steps: [
-              "Continue monitoring field conditions",
-              "Apply preventive fungicide if rain persists",
-              "Ensure proper crop rotation next season",
-              "Use resistant varieties in future planting"
-            ],
-            medicines: ["Azoxystrobin 23% SC", "Chlorothalonil 75% WP", "Prochloraz 45% EC"]
+            description: "Fungal infection causing orange-brown pustules on leaves.",
           }
-        ],
-        scanDuration: "12 minutes",
-        areaScanned: "5.2 hectares",
-        timestamp: new Date().toLocaleString()
-      });
+        ]
+      };
+      setDetailedReport(mockReport);
       setAnalyzingDrone(false);
       setIsDroneConnected(false);
-      toast.success("Livestream analysis complete!");
-    }, 3000);
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setResult(null);
-    }
+      toast.success("Detailed Engineering Report Generated!");
+      // Scroll to results
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    }, 2000);
   };
 
   const handleImageSelect = (file: File, preview: string) => {
     setSelectedFile(file);
     setResult(null);
+    setDetailedReport(null); // Clear complex report when doing simple upload
   };
 
   const handleAnalyze = async () => {
-    if (!selectedFile) {
-      toast.error("Please select an image first");
-      return;
-    }
-
+    if (!selectedFile) return;
     setAnalyzing(true);
+    setDetailedReport(null);
     try {
       const predictionResult = await predictDisease(selectedFile);
-
       if (predictionResult.error) {
-        toast.error(`Error: ${predictionResult.error}`);
-        setAnalyzing(false);
+        toast.error(predictionResult.error);
         return;
       }
 
-      // Determine severity based on confidence
-      let severity = "Low";
-      if (predictionResult.confidence > 80) {
-        severity = "High";
-      } else if (predictionResult.confidence > 60) {
-        severity = "Medium";
+      // Aggregate multi-disease data from boxes
+      const diseaseCounts: Record<string, number> = {};
+      const diseaseConfs: Record<string, number[]> = {};
+
+      if (predictionResult.boxes && predictionResult.boxes.length > 0) {
+        predictionResult.boxes.forEach((box: any) => {
+          const name = box.class || "Unknown";
+          diseaseCounts[name] = (diseaseCounts[name] || 0) + 1;
+          if (!diseaseConfs[name]) diseaseConfs[name] = [];
+          diseaseConfs[name].push(box.conf);
+        });
+      } else {
+        // Fallback for single classification or healthy if no boxes
+        const name = predictionResult.disease || "Unknown";
+        diseaseCounts[name] = 1;
+        diseaseConfs[name] = [predictionResult.confidence || 0];
       }
 
-      setResult({
-        disease: predictionResult.disease,
-        confidence: predictionResult.confidence,
-        severity: severity,
-        description: predictionResult.description,
-        treatment: predictionResult.treatment,
-        severity_status: predictionResult.severity_status,
-        medicines: predictionResult.medicines || [],
-        recommendations: [
-          predictionResult.treatment,
-          "Monitor the affected area regularly",
-          "Isolate affected plants if possible",
-          "Consult with local agricultural experts for specific guidance"
-        ]
+      const diseases = Object.keys(diseaseCounts).map(name => {
+        const avgConf = Math.round(diseaseConfs[name].reduce((a, b) => a + b, 0) / diseaseConfs[name].length);
+        return {
+          name: name,
+          severity: avgConf > 80 ? "High" : avgConf > 50 ? "Medium" : "Low",
+          affectedArea: Math.min(100, (diseaseCounts[name] * 15)) + "%", // Heuristic for static image
+          description: name === predictionResult.disease ? predictionResult.description : `Detected instance of ${name}`,
+          avgConfidence: avgConf
+        };
       });
-      toast.success("Analysis complete!");
-    } catch (error: any) {
-      console.error("Analysis failed:", error);
-      toast.error(`Analysis failed: ${error.message}`);
+
+      // Create a dummy timeline for static image to make charts work
+      const timeNow = new Date();
+      const timeStartStr = new Date(timeNow.getTime() - 60000).toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const timeEndStr = timeNow.toLocaleTimeString([], { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      const timelinePoint: any = { time: timeStartStr };
+      const timelinePointEnd: any = { time: timeEndStr };
+
+      diseases.forEach(d => {
+        timelinePoint[d.name] = d.avgConfidence;
+        timelinePointEnd[d.name] = d.avgConfidence;
+      });
+
+      const mockReport = {
+        id: "IMG-LOG-" + Math.floor(Math.random() * 10000),
+        source: "Image Upload",
+        duration: "Static Scan",
+        totalDiseases: diseases.length,
+        timelineData: [timelinePoint, timelinePointEnd],
+        diseases: diseases.length > 0 ? diseases : [{
+          name: "Healthy Crop",
+          severity: "None",
+          affectedArea: "0%",
+          description: "No significant disease markers detected.",
+          avgConfidence: 95
+        }]
+      };
+
+      setDetailedReport(mockReport);
+
+      // Clear legacy simple result to ensure only DetailedReportView shows
+      setResult(null);
+
+      toast.success("Image Analysis Complete!");
+      // Scroll to results
+      setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (e: any) {
+      toast.error(e.message);
     } finally {
       setAnalyzing(false);
     }
   };
 
+  const handleExport = () => {
+    toast.success("Exporting Engineering Report...");
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Navbar />
+    <div className={`min-h-screen flex bg-background transition-colors duration-300 font-sans ${isDarkMode ? 'dark' : ''} overflow-x-hidden`}>
 
-      <main className="flex-1 container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto">
-          <h1 className="text-4xl font-bold mb-2">Farmer Portal</h1>
-          <p className="text-muted-foreground mb-8">Upload crop images for instant AI-powered disease analysis</p>
+      {/* Sidebar - Ultra Compact */}
+      <aside className={`fixed lg:static z-50 h-screen bg-card/80 backdrop-blur-xl border-r shadow-xl transition-all duration-300 ${isSidebarOpen ? 'w-16 lg:w-64' : 'w-0 lg:w-16'} hidden lg:flex flex-col`}>
+        <div className="h-14 flex items-center justify-center border-b border-border/50">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 bg-gradient-to-br from-primary to-emerald-600 rounded-lg flex items-center justify-center shadow-lg text-white shrink-0">
+              <Leaf className="h-5 w-5" />
+            </div>
+            {isSidebarOpen && <span className="font-bold text-lg tracking-wide text-gradient lg:block hidden">AgroVision</span>}
+          </div>
+        </div>
 
-          {/* Two Column Layout - Image Upload Left, Live Stream Right */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Image Upload Card - Left - Using New Component */}
-            <ImageUploadSection 
-              onImageSelect={handleImageSelect}
-              onAnalyze={handleAnalyze}
-              analyzing={analyzing}
-            />
+        <nav className="flex-1 px-2 py-4 space-y-2">
+          <Button variant="ghost" size="sm" className={`w-full gap-3 h-10 text-sm font-medium rounded-lg hover:bg-primary/10 hover:text-primary transition-all px-0 justify-center lg:justify-start lg:px-3 bg-primary/10 text-primary`}>
+            <Activity className="h-4 w-4" />
+            <span className="hidden lg:block">{isSidebarOpen && "Dashboard"}</span>
+          </Button>
+          <Button variant="ghost" size="sm" className={`w-full gap-3 h-10 text-sm font-medium rounded-lg hover:bg-muted transition-all px-0 justify-center lg:justify-start lg:px-3`}>
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="hidden lg:block">{isSidebarOpen && "Settings"}</span>
+          </Button>
+        </nav>
 
-            {/* Drone Connection / Live Camera Card - Right */}
-            <Card className="border-primary/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Radio className="h-5 w-5 text-primary" />
-                  Live Stream Disease Detection
-                </CardTitle>
-                <CardDescription>Real-time prediction from drone or your device camera</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Tabs for Drone vs Camera vs Stream */}
-                <div className="flex gap-2 border-b overflow-x-auto">
-                  <button
-                    onClick={() => { setShowLiveCamera(false); setCameraReport(null); }}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                      !showLiveCamera
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Wifi className="h-4 w-4 inline mr-2" />
-                    Drone
-                  </button>
-                  <button
-                    onClick={() => { setShowLiveCamera(true); setDroneReport(null); }}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                      showLiveCamera
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Camera className="h-4 w-4 inline mr-2" />
-                    Your Camera
-                  </button>
-                  <button
-                    onClick={() => { setShowLiveCamera(null); setDroneReport(null); setCameraReport(null); }}
-                    className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors whitespace-nowrap ${
-                      showLiveCamera === null
-                        ? "border-primary text-primary"
-                        : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Video className="h-4 w-4 inline mr-2" />
-                    RTSP/Video
-                  </button>
-                </div>
+        <div className="p-2 border-t border-border/50">
+          <Button variant="ghost" size="sm" className={`w-full gap-3 text-destructive hover:bg-destructive/10 rounded-lg h-10 px-0 justify-center lg:justify-start lg:px-3`}>
+            <LogOut className="h-4 w-4" />
+            <span className="hidden lg:block">{isSidebarOpen && "Logout"}</span>
+          </Button>
+        </div>
+      </aside>
 
-                {/* Drone Tab */}
-                {!showLiveCamera && (
-                  <div className="space-y-4">
-                    {/* Connection Controls */}
-                    <div className="flex flex-col sm:flex-row gap-4 items-end">
-                      <div className="flex-1 space-y-2">
-                        <Label htmlFor="drone-url">Drone URL or IP Address</Label>
-                        <Input
-                          id="drone-url"
-                          placeholder="e.g., 192.168.1.100 or rtsp://..."
-                          value={droneUrl}
-                          onChange={(e) => setDroneUrl(e.target.value)}
-                          disabled={isDroneConnected}
-                        />
-                      </div>
-                      <div className="w-full sm:w-auto">
-                        {!isDroneConnected ? (
-                          <Button 
-                            onClick={handleDroneConnect}
-                            disabled={isConnecting}
-                            className="w-full sm:w-auto"
-                          >
-                            <Wifi className="h-4 w-4 mr-2" />
-                            {isConnecting ? "Connecting..." : "Pair Drone"}
-                          </Button>
-                        ) : (
-                          <Button 
-                            onClick={handleDroneDisconnect}
-                            variant="destructive"
-                            className="w-full sm:w-auto"
-                          >
-                            Disconnect
-                          </Button>
-                        )}
-                      </div>
+      {/* Main Content - Bento Grid Engine */}
+      <div className="flex-1 flex flex-col h-screen relative selection:bg-primary/20 bg-muted/10 overflow-hidden">
+
+        {/* Engineering Header */}
+        <header className="h-12 shrink-0 flex items-center justify-between px-4 lg:px-6 bg-background/80 backdrop-blur-md border-b sticky top-0 z-40">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="lg:hidden h-8 w-8" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-bold tracking-tight">Command Center</h2>
+              <span className="text-xs text-muted-foreground font-mono">v2.1.0-ENG</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="outline" className="hidden md:flex h-7 text-xs gap-2 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/10" onClick={handleExport}>
+              <Download className="h-3.5 w-3.5" />
+              Export Data
+            </Button>
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-muted/50 dark:bg-white/10 rounded-full border border-border/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-xs uppercase font-bold tracking-wider text-muted-foreground dark:text-emerald-400">ONLINE</span>
+            </div>
+            <Button variant="outline" size="icon" onClick={toggleTheme} className="rounded-full shadow-sm w-7 h-7 border-border/50">
+              {isDarkMode ? <Sun className="h-3.5 w-3.5 text-yellow-500" /> : <Moon className="h-3.5 w-3.5 text-slate-700" />}
+            </Button>
+          </div>
+        </header>
+
+        {/* Dashboard Grid - Refined Layout */}
+        <main className="flex-1 p-3 overflow-hidden">
+
+          {/* Main Grid: Diagnostics (Left) + Scrollable Sidebar (Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 h-full">
+
+            {/* Left: Diagnostic Engine (Full Height) */}
+            <div className="lg:col-span-9 h-full flex flex-col overflow-hidden">
+              <Card className="glass-card flex-1 border-none shadow-md rounded-xl overflow-hidden flex flex-col relative h-full">
+                <CardHeader className="py-2 px-4 border-b bg-muted/20 flex flex-row items-center justify-between shrink-0 h-10">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      <CardTitle className="text-sm font-bold uppercase tracking-wide">Diagnostic Engine</CardTitle>
                     </div>
-                    
-                    {isDroneConnected && (
-                      <div className="flex items-center gap-2 text-sm text-secondary">
-                        <CheckCircle className="h-4 w-4" />
-                        Connected to {droneUrl}
+                    {/* Model Switcher Dropdown */}
+                    <div className="hidden md:flex items-center gap-2 border-l border-border/50 pl-4">
+                      <ModelSelector />
+                      <div className="w-px h-6 bg-border/50 mx-1"></div>
+                      <LLMSelector />
+                    </div>
+                  </div>
+                  <div className="flex bg-background/50 p-0.5 rounded-md border border-border/50">
+                    {[
+                      { id: 'upload', icon: Upload, label: 'Upload' },
+                      { id: 'drone', icon: Wifi, label: 'Drone' },
+                      { id: 'camera', icon: Camera, label: 'Cam' },
+                      { id: 'rtsp', icon: Video, label: 'Stream' }
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => handleTabChange(tab.id as any)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wide transition-all duration-200",
+                          activeTab === tab.id
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <tab.icon className="h-3 w-3" />
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="p-0 flex-1 relative bg-black/5 dark:bg-black/20 flex flex-col overflow-hidden">
+                  <div className="flex-1 p-2 flex flex-col relative overflow-y-auto custom-scrollbar space-y-4">
+
+                    {/* INPUT AREA - Hidden when Report is Active for Focus Mode */}
+                    {!detailedReport && (
+                      <div className="w-full flex items-center justify-center p-2 min-h-[350px] animate-in fade-in duration-500">
+                        {activeTab === 'upload' ? (
+                          <div className="w-full max-w-2xl flex flex-col justify-center">
+                            <ImageUploadSection onImageSelect={handleImageSelect} onAnalyze={handleAnalyze} analyzing={analyzing} />
+                          </div>
+                        ) : activeTab === 'drone' ? (
+                          <div className="w-full flex flex-col gap-3 min-h-[300px]">
+                            <div className="flex gap-2 shrink-0">
+                              <div className="relative flex-1">
+                                <Wifi className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input placeholder="Drone Stream URL" className="h-9 pl-9 text-xs font-mono" value={droneUrl} onChange={e => setDroneUrl(e.target.value)} />
+                              </div>
+                              <Button size="sm" className="h-9" onClick={isDroneConnected ? handleDroneDisconnect : handleDroneConnect}>{isDroneConnected ? "Disconnect" : "Connect"}</Button>
+                            </div>
+                            <div className="flex-1 bg-black rounded-lg relative overflow-hidden flex flex-col items-center justify-center border border-white/10 shadow-inner group min-h-[400px]">
+                              <StreamDetector
+                                onReportGenerated={(report) => {
+                                  setDetailedReport(report);
+                                  toast.success("Drone Mission Analysis Complete");
+                                  setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ) : activeTab === 'camera' ? (
+                          <LiveCameraPredictor
+                            onReportGenerated={(report) => {
+                              setDetailedReport(report);
+                              toast.success("Monitoring Session Complete");
+                              setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full">
+                            {/* RTSP / Stream Tab */}
+                            <StreamDetector
+                              onReportGenerated={(report) => {
+                                setDetailedReport(report);
+                                toast.success("Video Analysis Complete");
+                                setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Video Placeholder */}
-                    <div className="aspect-[16/9] w-full min-h-[280px] bg-muted rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center overflow-hidden">
-                      {isDroneConnected ? (
-                        <div className="w-full h-full bg-foreground/90 flex flex-col items-center justify-center text-background">
-                          <Video className="h-16 w-16 mb-3 animate-pulse" />
-                          <p className="text-lg font-medium">Live Feed: {droneUrl}</p>
-                          <p className="text-sm opacity-70 mt-1">AI Detection Active</p>
-                        </div>
-                      ) : (
-                        <div className="text-center text-muted-foreground">
-                          <Video className="h-16 w-16 mx-auto mb-3 opacity-50" />
-                          <p className="text-base">Video feed will appear here</p>
-                          <p className="text-sm">Connect your drone to start</p>
+                    {/* RESULTS AREA - Rendered Below Input */}
+                    <div ref={resultsRef} className="scroll-mt-20">
+                      {/* 1. View: Detailed Engineering Report (Full Width Block) */}
+                      {detailedReport && (
+                        <div className="z-20 bg-background/50 backdrop-blur-xl p-2 animate-in fade-in zoom-in-95 duration-500 rounded-xl border border-border/50 shadow-lg min-h-[600px]">
+                          <div className="w-full h-full">
+                            <DetailedReportView
+                              reportData={detailedReport}
+                              onClose={() => setDetailedReport(null)}
+                              onRestart={() => setDetailedReport(null)}
+                            />
+                          </div>
                         </div>
                       )}
+
+                      {/* Legacy Simple Result Block Removed */}
                     </div>
 
-                    {/* End Livestream and Get Report Button */}
-                    <Button 
-                      className="w-full bg-gradient-to-r from-primary to-secondary hover:opacity-90"
-                      size="lg"
-                      onClick={handleEndLivestreamReport}
-                      disabled={!isDroneConnected || analyzingDrone}
-                    >
-                      {analyzingDrone ? "Analyzing Feed..." : "End Livestream and Get Report"}
-                    </Button>
                   </div>
-                )}
+                </CardContent>
+              </Card>
+            </div>
 
-                {/* Camera Tab */}
-                {showLiveCamera && !cameraReport && (
-                  <LiveCameraPredictor 
-                    onReportGenerated={(report) => {
-                      setCameraReport(report);
-                      toast.success("Live stream report generated!");
-                    }}
-                  />
-                )}
-
-                {/* RTSP/Stream Tab */}
-                {showLiveCamera === null && (
-                  <StreamDetector />
-                )}
-              </CardContent>
-            </Card>
+            {/* Right: Telemetry Sidebar (Scrollable) */}
+            <div className="lg:col-span-3 h-full overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto pr-1 space-y-3 custom-scrollbar pb-3">
+                <div className="shrink-0 min-h-[180px]"><WeatherSoilWidget /></div>
+                <div className="shrink-0 min-h-[180px]"><DroneTelemetryWidget /></div>
+                <div className="shrink-0 min-h-[220px]"><SystemLogWidget /></div>
+                <div className="shrink-0 min-h-[200px]"><CropHealthWidget /></div>
+              </div>
+            </div>
           </div>
 
-          {/* Image Analysis Results Section */}
-          {result && (
-            <Card className="border-primary/20 animate-fade-in mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {result.severity === "Low" ? (
-                    <CheckCircle className="h-5 w-5 text-secondary" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-destructive" />
-                  )}
-                  Image Analysis Results
-                </CardTitle>
-                <CardDescription>AI-powered disease detection report</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Disease</div>
-                    <div className="font-semibold text-sm">{result.disease}</div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Confidence</div>
-                    <div className="font-semibold text-primary">{result.confidence.toFixed(2)}%</div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Severity</div>
-                    <div className={`font-semibold ${
-                      result.severity === "High" ? "text-destructive" :
-                      result.severity === "Medium" ? "text-accent" :
-                      "text-secondary"
-                    }`}>
-                      {result.severity}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                  <h4 className="font-semibold mb-2">Description:</h4>
-                  <p className="text-sm text-muted-foreground">{result.description}</p>
-                </div>
-
-                <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                  <h4 className="font-semibold mb-2">Status:</h4>
-                  <p className="text-sm text-muted-foreground">{result.severity_status}</p>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold mb-3">Treatment & Recommendations:</h4>
-                  <ul className="space-y-2">
-                    {result.recommendations.map((rec: string, index: number) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-secondary mt-0.5 flex-shrink-0" />
-                        <span>{rec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {result.treatment && (
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                    <h4 className="font-semibold mb-2">Treatment:</h4>
-                    <p className="text-sm text-muted-foreground">{result.treatment}</p>
-                  </div>
-                )}
-
-                {result.medicines && result.medicines.length > 0 && (
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border">
-                    <h4 className="font-semibold mb-3">Recommended Medicines:</h4>
-                    <ul className="space-y-2">
-                      {result.medicines.map((medicine: string, index: number) => (
-                        <li key={index} className="flex items-start gap-2 text-sm">
-                          <CheckCircle className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <span>{medicine}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Drone Livestream Report Section */}
-          {droneReport && (
-            <Card className="border-primary/20 animate-fade-in mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Video className="h-5 w-5 text-primary" />
-                  Drone Livestream Analysis Report
-                </CardTitle>
-                <CardDescription>
-                  Scanned {droneReport.areaScanned} in {droneReport.scanDuration} • {droneReport.timestamp}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Summary Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                    <div className="text-sm text-muted-foreground mb-1">Total Diseases Found</div>
-                    <div className="text-3xl font-bold text-destructive">{droneReport.totalDiseases}</div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Area Scanned</div>
-                    <div className="text-2xl font-semibold">{droneReport.areaScanned}</div>
-                  </div>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <div className="text-sm text-muted-foreground mb-1">Scan Duration</div>
-                    <div className="text-2xl font-semibold">{droneReport.scanDuration}</div>
-                  </div>
-                </div>
-
-                {/* Disease Details */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold text-lg">Detected Diseases:</h4>
-                  {droneReport.diseases.map((disease: any, index: number) => (
-                    <div key={index} className="p-4 bg-muted/30 rounded-lg border border-border space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <h5 className="font-semibold text-primary">{disease.name}</h5>
-                        <div className="flex gap-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            disease.severity === "High" ? "bg-destructive/20 text-destructive" :
-                            disease.severity === "Medium" ? "bg-accent/20 text-accent" :
-                            "bg-secondary/20 text-secondary"
-                          }`}>
-                            {disease.severity} Severity
-                          </span>
-                          <span className="px-2 py-1 rounded text-xs font-medium bg-muted">
-                            {disease.affectedArea} Affected
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground">{disease.description}</p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h6 className="font-medium text-sm mb-2">Treatment Steps:</h6>
-                          <ul className="space-y-1">
-                            {disease.steps.map((step: string, stepIndex: number) => (
-                              <li key={stepIndex} className="flex items-start gap-2 text-sm">
-                                <span className="text-primary font-medium">{stepIndex + 1}.</span>
-                                <span>{step}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        <div>
-                          <h6 className="font-medium text-sm mb-2">Recommended Medicines:</h6>
-                          <ul className="space-y-1">
-                            {disease.medicines.map((medicine: string, medIndex: number) => (
-                              <li key={medIndex} className="flex items-start gap-2 text-sm">
-                                <CheckCircle className="h-4 w-4 text-secondary mt-0.5 flex-shrink-0" />
-                                <span>{medicine}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Live Camera Analysis Report Section */}
-          {cameraReport && (
-            <Card className="border-primary/20 animate-fade-in mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Camera className="h-5 w-5 text-primary" />
-                  Live Camera Disease Detection Report
-                </CardTitle>
-                <CardDescription>
-                  Duration: {cameraReport.duration}s • Detections: {cameraReport.totalDetections}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Summary Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                    <div className="text-sm text-muted-foreground mb-1">Total Detections</div>
-                    <div className="text-3xl font-bold text-primary">{cameraReport.totalDetections}</div>
-                  </div>
-                  <div className="p-4 bg-secondary/10 rounded-lg border border-secondary/20">
-                    <div className="text-sm text-muted-foreground mb-1">Unique Diseases Found</div>
-                    <div className="text-3xl font-bold text-secondary">{cameraReport.uniqueDiseases.length}</div>
-                  </div>
-                  <div className="p-4 bg-accent/10 rounded-lg border border-accent/20">
-                    <div className="text-sm text-muted-foreground mb-1">Stream Duration</div>
-                    <div className="text-3xl font-bold text-accent">{cameraReport.duration}s</div>
-                  </div>
-                </div>
-
-                {/* Disease Frequency & Confidence */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border space-y-3">
-                    <h5 className="font-semibold">Disease Frequency</h5>
-                    {Object.entries(cameraReport.diseaseFrequency).map(([disease, count]: [string, any]) => (
-                      <div key={disease} className="flex justify-between items-center text-sm">
-                        <span>{disease}</span>
-                        <span className="font-semibold bg-primary/20 px-2 py-1 rounded">{count}x</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="p-4 bg-muted/30 rounded-lg border border-border space-y-3">
-                    <h5 className="font-semibold">Average Confidence</h5>
-                    {Object.entries(cameraReport.averageConfidence).map(([disease, confidence]: [string, any]) => (
-                      <div key={disease} className="flex justify-between items-center text-sm">
-                        <span>{disease}</span>
-                        <span className="font-semibold text-primary">{Number(confidence).toFixed(1)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Detection Timeline */}
-                <div className="space-y-3">
-                  <h5 className="font-semibold">Detection Timeline (Last 10 Detections)</h5>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {cameraReport.detectionTimeline.slice(-10).reverse().map((detection: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded border border-border text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{detection.disease}</span>
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            detection.confidence > 80 ? "bg-destructive/20 text-destructive" :
-                            detection.confidence > 60 ? "bg-accent/20 text-accent" :
-                            "bg-secondary/20 text-secondary"
-                          }`}>
-                            {detection.confidence.toFixed(1)}%
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(detection.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={() => {
-                      setShowLiveCamera(true);
-                      setCameraReport(null);
-                    }}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Start New Stream
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      // Generate CSV report
-                      const csv = `Disease,Confidence,Time\n${cameraReport.detectionTimeline
-                        .map((d: any) => `${d.disease},${d.confidence.toFixed(1)},${new Date(d.timestamp).toLocaleTimeString()}`)
-                        .join("\n")}`;
-                      const blob = new Blob([csv], { type: "text/csv" });
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `camera-report-${new Date().getTime()}.csv`;
-                      a.click();
-                    }}
-                    className="flex-1 bg-gradient-to-r from-primary to-secondary"
-                  >
-                    Download Report
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </main>
-
-      <Footer />
+        </main>
+      </div>
     </div>
   );
 };
